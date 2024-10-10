@@ -1,0 +1,107 @@
+/* app.css */
+
+/* Navbar styling */
+.navbar {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background-color: #333;
+  padding: 10px 0;
+  z-index: 1000; /* Keep it above other content */
+}
+
+.navbar-list {
+  display: flex;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-item {
+  margin: 0 15px;
+}
+
+.navbar-link {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.navbar-link:hover {
+  color: #ccc;
+}
+
+.navbar-button {
+  background-color: transparent;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.navbar-button:hover {
+  color: #ccc;
+}
+
+/* Main content styling */
+#root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  margin-top: 60px; /* Offset for the fixed navbar */
+  padding: 2rem;
+}
+
+/* Card component styling */
+.card {
+  padding: 2em;
+  margin-top: 1.5em;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+}
+
+.ron-image{
+  width: 50%;
+  height: 50%;
+}
+.rating-stars {
+  margin-top: 10px;
+}
+
+.star {
+  font-size: 30px;
+  cursor: pointer;
+  color: #bbb;
+}
+
+.star.filled {
+  color: #f39c12;
+}
+
+.rated-quotes-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+  width: 100%;
+}
+
+/* Individual quote card styling */
+.rated-quote-card {
+  width: 80%;
+  max-width: 500px;
+  background-color: #050213;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}

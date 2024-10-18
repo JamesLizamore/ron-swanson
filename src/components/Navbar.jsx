@@ -1,10 +1,17 @@
-// components/Navbar.jsx
-import React from 'react';
+// Navbar.jsx
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import ConfirmationModal from './ConfirmationModal';
 
 function Navbar({ setLoggedIn }) {
+    const [isModalOpen, setModalOpen] = useState(false);
+
     const handleLogout = () => {
-        setLoggedIn(false); // Log the user out
+        setLoggedIn(false);
+    };
+
+    const openModal = () => {
+        setModalOpen(true);
     };
 
     return (
@@ -19,7 +26,15 @@ function Navbar({ setLoggedIn }) {
                 <li className="navbar-item">
                     <button onClick={handleLogout} className="navbar-button">Log Out</button>
                 </li>
+                {/* New Delete Unrated Quotes button */}
+                <li className="navbar-item">
+                    <button className="navbar-delete-button" onClick={openModal}>
+                        ⚠️ Delete Unrated Quotes
+                    </button>
+                </li>
             </ul>
+            {/* Modal for confirmation */}
+            {isModalOpen && <ConfirmationModal setModalOpen={setModalOpen} />}
         </nav>
     );
 }

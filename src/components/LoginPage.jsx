@@ -1,30 +1,26 @@
+// LoginPage.jsx
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';  // Import Firebase auth and Firestore
+import { auth } from '../config/firebase';
 
-const LoginPage = ({ setLoggedIn }) => {
+const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
     const handleLogin = async () => {
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const userId = userCredential.user.uid;
-
-            // Check if the user has a username in the Firestore 'users' collection
-            const userRef = doc(db, 'users', userId);
-            const userSnap = await getDoc(userRef);
-
-            if (!userSnap.exists()) {
-                // If no username exists, redirect to the SetUsername component
-                setLoggedIn('set-username');
-            } else {
-                setLoggedIn(true);  // Proceed to the main app if the user already has a username
+            // Input validation
+            if (email.trim() === '' || password.trim() === '') {
+                setError('Please enter both email and password.');
+                return;
             }
+
+            await signInWithEmailAndPassword(auth, email, password);
+            // onAuthStateChanged in App.jsx will handle state updates
         } catch (err) {
-            setError('Login failed. Please try again.');
+            setError('Login failed. Please check your credentials.');
+            console.error('Login error:', err);
         }
     };
 
@@ -44,7 +40,7 @@ const LoginPage = ({ setLoggedIn }) => {
                 onChange={(e) => setPassword(e.target.value)}
             />
             <button onClick={handleLogin}>Login</button>
-            {error && <p>{error}</p>}
+            {error && <p className="error-message">{error}</p>}
         </div>
     );
 };

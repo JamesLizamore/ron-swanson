@@ -1,5 +1,6 @@
+// RatedQuotes.jsx
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const RatedQuotes = () => {
@@ -9,56 +10,77 @@ const RatedQuotes = () => {
     useEffect(() => {
         const fetchRatings = async () => {
             try {
-                const ratingsCollection = collection(db, 'ratings');
-                const ratingsSnapshot = await getDocs(ratingsCollection);
+                // Fetch all ratings
+                const ratingsSnapshot = await getDocs(collection(db, 'ratings'));
                 const ratingsData = {};
 
-                for (const ratingDoc of ratingsSnapshot.docs) {
-                    const ratingData = ratingDoc.data();
+                // Group ratings by quoteId
+                ratingsSnapshot.docs.forEach((ratingDoc) => {
+                    const data = ratingDoc.data();
+                    const { quoteId, userId, rating } = data;
 
-                    // Fetch the corresponding quote using the quoteId
-                    let quoteId = ratingData.quoteId.includes('/')
-                        ? ratingData.quoteId.split('/').pop()
-                        : ratingData.quoteId;
-                    const quoteRef = doc(db, 'quotes', quoteId);
-                    const quoteSnap = await getDoc(quoteRef);
-
-                    // Fetch the corresponding username using the userId
-                    const userRef = doc(db, 'users', ratingData.userId);
-                    const userSnap = await getDoc(userRef);
-                    const username = userSnap.exists() ? userSnap.data().username : 'Unknown User';
-
-                    if (quoteSnap.exists()) {
-                        if (!ratingsData[quoteId]) {
-                            ratingsData[quoteId] = {
-                                quoteText: quoteSnap.data().text,
-                                totalRating: 0,
-                                ratingsCount: 0,
-                                userRatings: [],
-                            };
-                        }
-                        ratingsData[quoteId].totalRating += ratingData.rating;
-                        ratingsData[quoteId].ratingsCount++;
-                        ratingsData[quoteId].userRatings.push({
-                            username,
-                            rating: ratingData.rating,
-                        });
-                    } else {
-                        console.error("Quote not found for rating:", ratingDoc.id);
+                    if (!ratingsData[quoteId]) {
+                        ratingsData[quoteId] = {
+                            totalRating: 0,
+                            ratingsCount: 0,
+                            userRatings: [],
+                        };
                     }
-                }
 
-                const formattedRatings = Object.keys(ratingsData).map((quoteId) => ({
-                    quoteId,
-                    quoteText: ratingsData[quoteId].quoteText,
-                    averageRating: (ratingsData[quoteId].totalRating / ratingsData[quoteId].ratingsCount).toFixed(1),
-                    userRatings: ratingsData[quoteId].userRatings,
-                }));
+                    ratingsData[quoteId].totalRating += rating;
+                    ratingsData[quoteId].ratingsCount++;
+                    ratingsData[quoteId].userRatings.push({ userId, rating });
+                });
+
+                // Fetch all quotes and users in batches
+                const quoteIds = Object.keys(ratingsData);
+                const quotesPromises = quoteIds.map((id) => getDoc(doc(db, 'quotes', id)));
+                const quotesSnapshots = await Promise.all(quotesPromises);
+
+                const userIds = [
+                    ...new Set(
+                        ratingsSnapshot.docs.map((doc) => doc.data().userId)
+                    ),
+                ];
+                const usersPromises = userIds.map((id) => getDoc(doc(db, 'users', id)));
+                const usersSnapshots = await Promise.all(usersPromises);
+
+                const quotesMap = {};
+                quotesSnapshots.forEach((snap) => {
+                    if (snap.exists()) {
+                        quotesMap[snap.id] = snap.data().text;
+                    }
+                });
+
+                const usersMap = {};
+                usersSnapshots.forEach((snap) => {
+                    if (snap.exists()) {
+                        usersMap[snap.id] = snap.data().username;
+                    }
+                });
+
+                const formattedRatings = quoteIds.map((quoteId) => {
+                    const quoteText = quotesMap[quoteId] || 'Unknown Quote';
+                    const { totalRating, ratingsCount, userRatings } = ratingsData[quoteId];
+                    const averageRating = (totalRating / ratingsCount).toFixed(1);
+
+                    const userRatingsWithNames = userRatings.map((ur) => ({
+                        username: usersMap[ur.userId] || 'Unknown User',
+                        rating: ur.rating,
+                    }));
+
+                    return {
+                        quoteId,
+                        quoteText,
+                        averageRating,
+                        userRatings: userRatingsWithNames,
+                    };
+                });
 
                 setRatings(formattedRatings);
-                setLoading(false);  // Stop loading
+                setLoading(false);
             } catch (error) {
-                console.error("Error fetching ratings:", error);
+                console.error('Error fetching ratings:', error);
             }
         };
 
@@ -68,8 +90,8 @@ const RatedQuotes = () => {
     const renderStars = (rating) => {
         return [...Array(5)].map((_, i) => (
             <span key={i} className={`star ${i < rating ? 'filled' : ''}`}>
-                ★
-            </span>
+        ★
+      </span>
         ));
     };
 
@@ -94,7 +116,8 @@ const RatedQuotes = () => {
                                 <ul>
                                     {rating.userRatings.map((userRating, i) => (
                                         <li key={i}>
-                                            {userRating.username}: {userRating.rating} {renderStars(userRating.rating)}
+                                            {userRating.username}: {userRating.rating}{' '}
+                                            {renderStars(userRating.rating)}
                                         </li>
                                     ))}
                                 </ul>

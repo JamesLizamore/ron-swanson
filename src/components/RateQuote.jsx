@@ -1,105 +1,104 @@
+// RateQuote.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { collection,addDoc, getDocs, query, where } from 'firebase/firestore';
-import { db, auth } from '../config/firebase'; // Firestore and Firebase auth
+import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 
-function RateQuote({ setRatedQuotes, ratedQuotes }) {
-    const [quote, setQuote] = useState(''); // The quote text
-    const [quoteId, setQuoteId] = useState(null); // Firestore document ID of the quote
-    const [rating, setRating] = useState(0); // The confirmed rating
-    const [hoverRating, setHoverRating] = useState(0); // The hover state for rating
-    const [unratedQuotes, setUnratedQuotes] = useState([]); // Quotes not yet rated by the user
+function RateQuote() {
+    const [quote, setQuote] = useState('');
+    const [quoteId, setQuoteId] = useState(null);
+    const [rating, setRating] = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
 
-    // Step 1: Fetch Quotes Rated by Others but Not by the Current User
-    const fetchUnratedQuotes = async () => {
+    const fetchUnratedQuote = async () => {
         try {
             const userId = auth.currentUser.uid;
 
-            // 1. Fetch all ratings of the current user
-            const userRatingsCollection = collection(db, 'ratings');
-            const userRatingsQuery = query(userRatingsCollection, where('userId', '==', userId));
+            // Fetch quotes rated by the user
+            const userRatingsQuery = query(
+                collection(db, 'ratings'),
+                where('userId', '==', userId)
+            );
             const userRatingsSnapshot = await getDocs(userRatingsQuery);
-
             const ratedQuoteIds = userRatingsSnapshot.docs.map((doc) => doc.data().quoteId);
 
-            // 2. Fetch quotes that have been rated by other users, but not by the current user
-            const quotesCollection = collection(db, 'quotes');
-            const allQuotesSnapshot = await getDocs(quotesCollection);
+            // Fetch all quotes
+            const allQuotesSnapshot = await getDocs(collection(db, 'quotes'));
+            const unratedQuotes = allQuotesSnapshot.docs.filter(
+                (quoteDoc) => !ratedQuoteIds.includes(quoteDoc.id)
+            );
 
-            const unratedByUser = allQuotesSnapshot.docs.filter((quoteDoc) => {
-                const quoteId = quoteDoc.id;
-                return !ratedQuoteIds.includes(quoteId); // Only keep quotes not rated by the user
-            });
-
-            // 3. Randomize and set the unrated quotes
-            setUnratedQuotes(unratedByUser.map((doc) => ({ id: doc.id, ...doc.data() })));
-
-            if (unratedByUser.length > 0) {
-                const randomQuote = unratedByUser[Math.floor(Math.random() * unratedByUser.length)];
-                setQuote(randomQuote.data().text);
-                setQuoteId(randomQuote.id);
+            if (unratedQuotes.length > 0) {
+                // Select a random unrated quote
+                const randomQuoteDoc =
+                    unratedQuotes[Math.floor(Math.random() * unratedQuotes.length)];
+                setQuote(randomQuoteDoc.data().text);
+                setQuoteId(randomQuoteDoc.id);
             } else {
-                // No unrated quotes available, fetch new quote from the API
-                getQuoteFromAPI();
+                // Fetch a new quote from the API
+                await getQuoteFromAPI();
             }
+
+            setRating(0);
+            setHoverRating(0);
         } catch (error) {
-            console.error("Error fetching unrated quotes: ", error);
+            console.error('Error fetching unrated quote:', error);
         }
     };
 
-    // Fetch a random quote from the Ron Swanson API if no unrated quotes are found
     const getQuoteFromAPI = async () => {
         try {
-            const response = await axios.get('https://ron-swanson-quotes.herokuapp.com/v2/quotes');
+            const response = await axios.get(
+                'https://ron-swanson-quotes.herokuapp.com/v2/quotes'
+            );
             const quoteText = response.data[0];
 
-            // Check if the quote already exists in Firestore
-            const quotesCollection = collection(db, "quotes");
-            const q = query(quotesCollection, where("text", "==", quoteText));
-            const querySnapshot = await getDocs(q);
+            // Check if the quote already exists
+            const quotesQuery = query(
+                collection(db, 'quotes'),
+                where('text', '==', quoteText)
+            );
+            const quotesSnapshot = await getDocs(quotesQuery);
 
-            if (!querySnapshot.empty) {
-                // If the quote already exists, use its Firestore document ID
-                const existingQuote = querySnapshot.docs[0];
-                setQuoteId(existingQuote.id);
+            if (!quotesSnapshot.empty) {
+                const existingQuoteDoc = quotesSnapshot.docs[0];
+                setQuoteId(existingQuoteDoc.id);
                 setQuote(quoteText);
             } else {
-                // If the quote doesn't exist, add it to Firestore with an auto-generated document ID
-                const docRef = await addDoc(quotesCollection, { text: quoteText });
-                setQuoteId(docRef.id);
+                // Add new quote to Firestore
+                const newQuoteDoc = await addDoc(collection(db, 'quotes'), {
+                    text: quoteText,
+                });
+                setQuoteId(newQuoteDoc.id);
                 setQuote(quoteText);
             }
-
-            setRating(0); // Reset the rating when a new quote is fetched
-            setHoverRating(0); // Reset hover rating as well
         } catch (error) {
-            console.error("Error fetching quote from API: ", error);
+            console.error('Error fetching quote from API:', error);
         }
     };
 
-    // Submit the user's rating for the quote
     const handleSubmitRating = async () => {
         try {
-            const ratingsCollection = collection(db, 'ratings');
-            await addDoc(ratingsCollection, {
-                quoteId: quoteId,  // Reference the quote's document ID
-                userId: auth.currentUser.uid,  // Current logged-in user's ID
-                rating: rating  // The user's rating for the quote
+            if (rating === 0) {
+                alert('Please select a rating.');
+                return;
+            }
+
+            await addDoc(collection(db, 'ratings'), {
+                quoteId: quoteId,
+                userId: auth.currentUser.uid,
+                rating: rating,
             });
 
-            // Store the rating locally
-            const newRatedQuote = { quote, rating };
-            setRatedQuotes([...ratedQuotes, newRatedQuote]);
-
-            // Fetch a new unrated quote after submitting the rating
-            fetchUnratedQuotes();
+            // Fetch the next unrated quote
+            fetchUnratedQuote();
         } catch (error) {
-            console.error("Error submitting rating: ", error);
+            console.error('Error submitting rating:', error);
         }
     };
 
     useEffect(() => {
-        fetchUnratedQuotes(); // Fetch quotes not rated by the user when the component loads
+        fetchUnratedQuote();
     }, []);
 
     return (
@@ -111,12 +110,12 @@ function RateQuote({ setRatedQuotes, ratedQuotes }) {
                     <span
                         key={star}
                         className={star <= (hoverRating || rating) ? 'star filled' : 'star'}
-                        onClick={() => setRating(star)}  // Update rating when clicked
-                        onMouseEnter={() => setHoverRating(star)}  // Show hover rating
-                        onMouseLeave={() => setHoverRating(0)}  // Reset hover rating
+                        onClick={() => setRating(star)}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
                     >
-                        ★
-                    </span>
+            ★
+          </span>
                 ))}
             </div>
             <button onClick={handleSubmitRating} disabled={rating === 0} className="submit-button">

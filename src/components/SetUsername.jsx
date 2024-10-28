@@ -1,22 +1,40 @@
+// SetUsername.jsx
 import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';  // Import Firestore
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 
-const SetUsername = ({ setLoggedIn }) => {
+const SetUsername = () => {
     const [username, setUsername] = useState('');
     const [error, setError] = useState('');
 
     const handleSetUsername = async () => {
         try {
+            const trimmedUsername = username.trim();
+
+            // Input validation
+            if (trimmedUsername.length < 3) {
+                setError('Username must be at least 3 characters long.');
+                return;
+            }
+
+            // Check for duplicate usernames
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('username', '==', trimmedUsername));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                setError('Username is already taken. Please choose another one.');
+                return;
+            }
+
+            // Save the username to Firestore
             const userId = auth.currentUser.uid;
+            await setDoc(doc(db, 'users', userId), { username: trimmedUsername });
 
-            // Save the username to Firestore under the 'users' collection
-            await setDoc(doc(db, 'users', userId), { username });
-
-            // After setting the username, log the user into the app
-            setLoggedIn(true);
+            // onAuthStateChanged in App.jsx will handle state updates
         } catch (err) {
             setError('Failed to set username. Please try again.');
+            console.error('Error setting username:', err);
         }
     };
 
@@ -30,7 +48,7 @@ const SetUsername = ({ setLoggedIn }) => {
                 onChange={(e) => setUsername(e.target.value)}
             />
             <button onClick={handleSetUsername}>Set Username</button>
-            {error && <p>{error}</p>}
+            {error && <p className="error-message">{error}</p>}
         </div>
     );
 };
